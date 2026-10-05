@@ -176,10 +176,10 @@ function printWelcomeBanner(opts = {}) {
 
   console.log("");
   console.log(colors.primary("  ███████╗ █████╗ ███████╗███████╗"));
-  console.log(colors.primary("  ██╔════╝██╔══██╗██╔════╝██╔════╝"));
-  console.log(colors.secondary("  █████╗  ███████║███████╗█████╗  "));
-  console.log(colors.secondary("  ██╔══╝  ██╔══██║╚════██║██╔══╝  "));
-  console.log(colors.accent("  ███████╗██║  ██║███████║███████╗"));
+  console.log(colors.primary("  ██╔════╝██╔══██╗╚══███╔╝██╔════╝"));
+  console.log(colors.secondary("  █████╗  ███████║   ███╔╝ █████╗  "));
+  console.log(colors.secondary("  ██╔══╝  ██╔══██║  ███╔╝  ██╔══╝  "));
+  console.log(colors.accent("  ███████╗██║  ██║███████╗███████╗"));
   console.log(colors.accent("  ╚══════╝╚═╝  ╚═╝╚══════╝╚══════╝"));
   console.log("");
   console.log(colors.muted(`  Eaze - v${VERSION}   A Beginner-Friendly Language`));
