@@ -84,14 +84,14 @@ const COMMAND_WORDS = [
 // COLOR PALETTE & STYLING
 // ============================================================================
 const colors = {
-  primary: chalk.rgb(106, 153, 255),
-  secondary: chalk.rgb(255, 159, 64),
-  success: chalk.rgb(76, 175, 80),
-  error: chalk.rgb(244, 67, 54),
-  warning: chalk.rgb(255, 193, 7),
-  accent: chalk.rgb(156, 39, 176),
-  muted: chalk.rgb(158, 158, 158),
-  highlight: chalk.rgb(255, 87, 34),
+  primary: chalk.rgb(168, 168, 160), // ash grey
+  secondary: chalk.rgb(232, 220, 196), // parchment
+  success: chalk.rgb(143, 188, 143), // sage
+  error: chalk.rgb(205, 92, 92), // muted crimson
+  warning: chalk.rgb(222, 184, 135), // tan
+  accent: chalk.rgb(139, 119, 84), // bronze (frames)
+  muted: chalk.rgb(140, 135, 125), // warm grey
+  highlight: chalk.rgb(208, 208, 200), // light ash
 };
 
 // ============================================================================
@@ -111,17 +111,17 @@ function boxInnerWidth() {
 
 function boxTop() {
   const w = boxInnerWidth();
-  return colors.accent("  ╔" + "═".repeat(w + 1) + "╗");
+  return colors.accent("  ╭" + "─".repeat(w + 1) + "╮");
 }
 
 function boxMid() {
   const w = boxInnerWidth();
-  return colors.accent("  ╠" + "═".repeat(w + 1) + "╣");
+  return colors.accent("  ├" + "─".repeat(w + 1) + "┤");
 }
 
 function boxBottom() {
   const w = boxInnerWidth();
-  return colors.accent("  ╚" + "═".repeat(w + 1) + "╝");
+  return colors.accent("  ╰" + "─".repeat(w + 1) + "╯");
 }
 
 // Format content to fit perfectly in box (callers truncate values first;
@@ -132,14 +132,14 @@ function boxLine(content) {
   const visibleLength = stripAnsi(contentStr).length;
   if (visibleLength > inner) {
     const plain = stripAnsi(contentStr).slice(0, inner - 1) + "…";
-    return colors.accent("  ║ ") + plain + colors.accent("║");
+    return colors.accent("  │ ") + plain + colors.accent("│");
   }
   const padding = inner - visibleLength;
   return (
-    colors.accent("  ║ ") +
+    colors.accent("  │ ") +
     contentStr +
     " ".repeat(padding) +
-    colors.accent("║")
+    colors.accent("│")
   );
 }
 
@@ -174,48 +174,50 @@ function printWelcomeBanner(opts = {}) {
     console.clear();
   }
 
+  const w = Math.min(54, Math.max(30, (process.stdout.columns || 80) - 6));
+  const rule = colors.accent("  " + "─".repeat(w));
   console.log("");
   console.log(colors.primary("  ███████╗ █████╗ ███████╗███████╗"));
   console.log(colors.primary("  ██╔════╝██╔══██╗╚══███╔╝██╔════╝"));
-  console.log(colors.secondary("  █████╗  ███████║   ███╔╝ █████╗  "));
-  console.log(colors.secondary("  ██╔══╝  ██╔══██║  ███╔╝  ██╔══╝  "));
-  console.log(colors.accent("  ███████╗██║  ██║███████╗███████╗"));
-  console.log(colors.accent("  ╚══════╝╚═╝  ╚═╝╚══════╝╚══════╝"));
+  console.log(colors.highlight("  █████╗  ███████║  ███╔╝ █████╗  "));
+  console.log(colors.highlight("  ██╔══╝  ██╔══██║ ███╔╝  ██╔══╝  "));
+  console.log(colors.secondary("  ███████╗██║  ██║███████╗███████╗"));
+  console.log(colors.secondary("  ╚══════╝╚═╝  ╚═╝╚══════╝╚══════╝"));
   console.log("");
-  console.log(colors.muted(`  Eaze - v${VERSION}   A Beginner-Friendly Language`));
-  console.log("");
-
-  console.log(colors.secondary("  Welcome to Eaze!"));
+  console.log(rule);
   console.log(
-    colors.muted("  A simple, beginner-friendly programming language."),
+    `  ${colors.secondary("A gentle language for new programmers")}  ${colors.muted("v" + VERSION)}`,
   );
+  console.log(rule);
   console.log("");
 
-  const features = [
-    [figures.play, "Multi-line support for loops, conditionals & functions"],
-    [figures.star, "Beautiful syntax-aware output"],
-    [figures.tick, "Real-time variable tracking"],
-    [figures.arrowRight, "Instant code execution"],
+  const tips = [
+    ["help", "list commands"],
+    ["vars", "inspect variables"],
+    ["load <file>", "run an .eaze file"],
+    ["exit", "leave the REPL"],
   ];
-
-  features.forEach(([icon, feature]) => {
-    console.log(`  ${colors.secondary(icon)} ${colors.muted(feature)}`);
+  tips.forEach(([cmd, desc]) => {
+    console.log(
+      `  ${colors.primary(figures.pointer)} ${colors.secondary(cmd.padEnd(12))} ${colors.muted(desc)}`,
+    );
   });
-
   console.log("");
   console.log(
-    `  ${colors.muted("Type")} ${colors.primary('"help"')} ${colors.muted("for commands or")} ${colors.primary('"exit"')} ${colors.muted("to quit")}`,
+    colors.muted("  Try:  ") + colors.highlight('set name to "world"') + colors.muted("  then  ") + colors.highlight("show name"),
+  );
+  console.log(
+    colors.muted("  Tip:  Tab completes keywords · multi-line blocks end with ") + colors.primary("end"),
   );
   console.log("");
 }
-
 // ============================================================================
 // HELP MENUS
 // ============================================================================
 function printHelpMenu() {
   console.log("");
   console.log(boxTop());
-  console.log(boxLine(colors.primary("EAZE COMMAND REFERENCE")));
+  console.log(boxLine(colors.primary("E A Z E   ·   COMMAND REFERENCE")));
   console.log(boxMid());
 
   const commands = [
@@ -539,7 +541,7 @@ function lexAndParse(code) {
 
 function printErrorWithContext(error, code) {
   console.log("");
-  console.log(`  ${colors.error(figures.cross)} ${chalk.white(error.toString())}`);
+  console.log(`  ${colors.error(figures.cross)} ${colors.secondary(error.toString())}`);
   if (error && error.line) {
     const lines = String(code).split("\n");
     const target = lines[error.line - 1];
@@ -553,7 +555,7 @@ function printErrorWithContext(error, code) {
   }
   console.log(
     colors.muted(
-      `  hint: fix the line above, or type "explain" in the REPL for AI help`,
+      `  ${figures.pointer} hint: fix the line above, or type "explain" in the REPL for AI help`,
     ),
   );
   console.log("");
@@ -567,7 +569,7 @@ async function run(code, opts = {}) {
   interpreter.setOutputHandler((output) => {
     printedAnyOutput = true;
     process.stdout.write(
-      `  ${colors.success(figures.arrowRight)} ${chalk.white(String(output))}\n`,
+      `  ${colors.success("▸")} ${colors.secondary(String(output))}\n`,
     );
   });
 
@@ -884,8 +886,8 @@ function makeCompleter() {
 function startREPL(cliOpts = {}) {
   printWelcomeBanner();
 
-  const mainPrompt = colors.primary("eaze> ");
-  const contPrompt = colors.muted("...   ");
+  const mainPrompt = colors.primary("eaze ") + colors.accent("❯ ");
+  const contPrompt = colors.accent("  ┆ ");
 
   const rl = readline.createInterface({
     input: process.stdin,
