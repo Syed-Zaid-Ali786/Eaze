@@ -12,23 +12,13 @@ export class EazeError extends Error {
   }
 }
 
-export class LexerError extends EazeError {
+const sub = (name) => ({ [name]: class extends EazeError {
   constructor(message, line, column) {
     super(message, line, column);
-    this.name = 'LexerError';
+    this.name = name;
   }
-}
+} })[name];
 
-export class ParseError extends EazeError {
-  constructor(message, line, column) {
-    super(message, line, column);
-    this.name = 'ParseError';
-  }
-}
-
-export class RuntimeError extends EazeError {
-  constructor(message, line, column) {
-    super(message, line, column);
-    this.name = 'RuntimeError';
-  }
-}
+export const LexerError = sub('LexerError');
+export const ParseError = sub('ParseError');
+export const RuntimeError = sub('RuntimeError');

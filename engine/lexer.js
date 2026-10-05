@@ -10,45 +10,11 @@ export const TokenType = {
   EOF: "EOF",
 };
 
-const KEYWORDS = new Set([
-  "set",
-  "to",
-  "show",
-  "say",
-  "if",
-  "else",
-  "end",
-  "repeat",
-  "times",
-  "while",
-  "and",
-  "or",
-  "not",
-  "ask",
-  "into",
-  "define",
-  "return",
-  "call",
-]);
+const KEYWORDS = new Set(
+  "set to show say if else end repeat times while and or not ask into define return call".split(" "),
+);
 
-const OPERATORS = new Set([
-  "+",
-  "-",
-  "*",
-  "/",
-  "==",
-  "!=",
-  "<",
-  ">",
-  "<=",
-  ">=",
-  "=",
-  "(",
-  ")",
-  "[",
-  "]",
-  ",",
-]);
+const TWO_CHAR_OPS = new Set(["==", "!=", "<=", ">="]);
 
 export class Lexer {
   constructor(input) {
@@ -60,25 +26,19 @@ export class Lexer {
 
   tokenize() {
     const tokens = [];
-    let token = this.nextToken();
-    while (token.type !== TokenType.EOF) {
-      tokens.push(token);
-      token = this.nextToken();
-    }
-    tokens.push(token); // Push EOF
+    let token;
+    do tokens.push((token = this.nextToken()));
+    while (token.type !== TokenType.EOF);
     return tokens;
   }
 
   nextToken() {
     this.skipWhitespaceAndComments();
-
     if (this.position >= this.input.length) {
       return this.createToken(TokenType.EOF, "EOF");
     }
-
     const char = this.input[this.position];
 
-    // Newlines
     if (char === "\n") {
       const token = this.createToken(TokenType.NEWLINE, "\n");
       this.position++;
@@ -86,148 +46,70 @@ export class Lexer {
       this.column = 1;
       return token;
     }
-
-    // Numbers
     if (/[0-9]/.test(char)) {
-      return this.readNumber();
+      const t = this.readWhile(/[0-9.]/, TokenType.NUMBER);
+      t.value = parseFloat(t.value);
+      return t;
     }
-
-    // Identifiers and Keywords
     if (/[a-zA-Z_]/.test(char)) {
-      return this.readIdentifierOrKeyword();
+      const t = this.readWhile(/[a-zA-Z0-9_]/, TokenType.IDENTIFIER);
+      if (KEYWORDS.has(t.value)) t.type = TokenType.KEYWORD;
+      return t;
     }
+    if (char === '"' || char === "'") return this.readString(char);
+    if (/[+\-*/=<>()[\],!]/.test(char)) return this.readOperator();
 
-    // Strings
-    if (char === '"' || char === "'") {
-      return this.readString(char);
-    }
-
-    // Operators and Punctuation
-    if (/[+\-*/=<>()[\],!]/.test(char)) {
-      return this.readOperator();
-    }
-
-    throw new LexerError(
-      `Unexpected character: '${char}'`,
-      this.line,
-      this.column,
-    );
+    throw new LexerError(`Unexpected character: '${char}'`, this.line, this.column);
   }
 
   skipWhitespaceAndComments() {
-    while (this.position < this.input.length) {
-      const char = this.input[this.position];
+    const s = this.input;
+    while (this.position < s.length) {
+      const char = s[this.position];
       if (char === " " || char === "\t" || char === "\r") {
         this.position++;
         this.column++;
       } else if (char === "#") {
-        // Skip comment until newline
-        while (
-          this.position < this.input.length &&
-          this.input[this.position] !== "\n"
-        ) {
-          this.position++;
-        }
-      } else {
-        break;
-      }
+        while (this.position < s.length && s[this.position] !== "\n") this.position++;
+      } else break;
     }
   }
 
-  readNumber() {
-    let value = "";
-    const startCol = this.column;
-    while (
-      this.position < this.input.length &&
-      /[0-9.]/.test(this.input[this.position])
-    ) {
-      value += this.input[this.position];
+  readWhile(re, type) {
+    const start = this.position;
+    const column = this.column;
+    while (this.position < this.input.length && re.test(this.input[this.position])) {
       this.position++;
       this.column++;
     }
-    return {
-      type: TokenType.NUMBER,
-      value: parseFloat(value),
-      line: this.line,
-      column: startCol,
-    };
-  }
-
-  readIdentifierOrKeyword() {
-    let value = "";
-    const startCol = this.column;
-    while (
-      this.position < this.input.length &&
-      /[a-zA-Z0-9_]/.test(this.input[this.position])
-    ) {
-      value += this.input[this.position];
-      this.position++;
-      this.column++;
-    }
-
-    if (KEYWORDS.has(value)) {
-      return {
-        type: TokenType.KEYWORD,
-        value,
-        line: this.line,
-        column: startCol,
-      };
-    }
-    return {
-      type: TokenType.IDENTIFIER,
-      value,
-      line: this.line,
-      column: startCol,
-    };
+    return { type, value: this.input.slice(start, this.position), line: this.line, column };
   }
 
   readString(quote) {
-    let value = "";
-    const startCol = this.column;
-    this.position++; // Skip opening quote
+    const column = this.column;
+    const start = ++this.position;
     this.column++;
-
-    while (
-      this.position < this.input.length &&
-      this.input[this.position] !== quote
-    ) {
-      value += this.input[this.position];
+    while (this.position < this.input.length && this.input[this.position] !== quote) {
       this.position++;
       this.column++;
     }
-
     if (this.position >= this.input.length) {
-      throw new LexerError("Unterminated string", this.line, startCol);
+      throw new LexerError("Unterminated string", this.line, column);
     }
-
-    this.position++; // Skip closing quote
+    const value = this.input.slice(start, this.position++);
     this.column++;
-    return { type: TokenType.STRING, value, line: this.line, column: startCol };
+    return { type: TokenType.STRING, value, line: this.line, column };
   }
 
   readOperator() {
-    const startCol = this.column;
-    let op = this.input[this.position];
-    this.position++;
+    const column = this.column;
+    let op = this.input[this.position++];
     this.column++;
-
-    // Check for two-character operators
-    if (this.position < this.input.length) {
-      const nextChar = this.input[this.position];
-      const twoCharOp = op + nextChar;
-      if (OPERATORS.has(twoCharOp) && twoCharOp.length === 2) {
-        op = twoCharOp;
-        this.position++;
-        this.column++;
-      }
+    if (TWO_CHAR_OPS.has(op + this.input[this.position])) {
+      op += this.input[this.position++];
+      this.column++;
     }
-
-    return {
-      type: TokenType.OPERATOR,
-      value: op,
-      line: this.line,
-      column: startCol,
-    };
+    return { type: TokenType.OPERATOR, value: op, line: this.line, column };
   }
 
   createToken(type, value) {

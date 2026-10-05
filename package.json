@@ -4,6 +4,9 @@
   "description": "Eaze - A custom programming language with an AI assistant",
   "main": "engine/interpreter.js",
   "type": "module",
+  "bin": {
+    "eaze": "./cli/index.js"
+  },
   "scripts": {
     "start": "node cli/index.js",
     "test": "node --test"
