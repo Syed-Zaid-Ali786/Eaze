@@ -119,9 +119,9 @@ const Toolbar = () => {
         </span>
         <span className="brand-text">
           <span className="brand-name">
-            Eaze <b>Playground</b>
+            eaze<span className="brand-period">.</span>
           </span>
-          <span className="brand-tag">Learn Build Create</span>
+          <span className="brand-tag">PLAYGROUND</span>
         </span>
       </div>
 
@@ -210,7 +210,7 @@ const Toolbar = () => {
           title="Run your program (F5)"
         >
           <Icon name="play" size={15} />
-          Run
+          Run code <kbd>F5</kbd>
         </button>
       </div>
     </header>

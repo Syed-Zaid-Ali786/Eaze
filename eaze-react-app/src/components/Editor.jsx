@@ -23,6 +23,7 @@ const KEYWORD_CLASS = {
   define: "kw-block",
   end: "kw-block",
   return: "kw-std",
+  true: "kw-std", false: "kw-std", modulo: "kw-std",
 };
 
 const HIGHLIGHT_KEYWORDS = new Set(Object.keys(KEYWORD_CLASS));
@@ -107,7 +108,7 @@ function highlightEaze(code) {
 }
 
 const Editor = ({ code, onCodeChange }) => {
-  const { settings, activeFile, undo, redo, files, addFile } = useAppContext();
+  const { settings, activeFile, activeIdx, setActiveIdx, undo, redo, files, addFile } = useAppContext();
   const { runCode } = useInterpreter();
 
   /** `+` on the tab strip: create a fresh, unused scratch file. */
@@ -138,8 +139,8 @@ const Editor = ({ code, onCodeChange }) => {
   };
 
   const syncScroll = () => {
-    preRef.current.scrollTop = gutterRef.current.scrollTop =
-      textareaRef.current.scrollTop;
+    preRef.current.scrollTop = textareaRef.current.scrollTop;
+    if (gutterRef.current) gutterRef.current.scrollTop = textareaRef.current.scrollTop;
     preRef.current.scrollLeft = textareaRef.current.scrollLeft;
   };
 
@@ -195,8 +196,8 @@ const Editor = ({ code, onCodeChange }) => {
         const end = textareaRef.current.selectionEnd;
         const val = code;
 
-        let newValue = "";
-        let newStart = start + 1;
+        let newValue;
+        const newStart = start + 1;
         let newEnd = end + 1;
 
         if (start !== end) {
@@ -241,10 +242,11 @@ const Editor = ({ code, onCodeChange }) => {
   return (
     <div className="panel editor-panel">
       <div className="editor-tabs">
-        <div className="editor-tab active" title={activeFile?.path || activeFile?.name}>
+        {files.map((file, index) => <button type="button" key={`${file.name}-${index}`} className={`editor-tab ${index === activeIdx ? "active" : ""}`} onClick={() => setActiveIdx(index)} title={file.path || file.name}>
           <Icon name="file-code" size={15} className="editor-tab-icon" />
-          <span className="editor-tab-name">{activeFile?.name || "untitled.eaze"}</span>
-        </div>
+          <span className="editor-tab-name">{file.name}</span>
+          {index === activeIdx && <span className="tab-dot" />}
+        </button>)}
         <button
           type="button"
           className="editor-tab-add"
@@ -257,6 +259,7 @@ const Editor = ({ code, onCodeChange }) => {
           Ln {cursorPos.line}, Col {cursorPos.col}
         </span>
       </div>
+      <div className="editor-breadcrumb"><span>Workspace</span><span>/</span>{activeFile?.name}<span className="editor-language">Eaze</span></div>
       <div className="editor-area" style={{ "--editor-line-height": `${lineHeight}px` }}>
         {settings.showLineNumbers && (
           <div className="gutter" ref={gutterRef}>
@@ -283,9 +286,11 @@ const Editor = ({ code, onCodeChange }) => {
             onClick={updateCursorPos}
             onKeyUp={updateCursorPos}
             spellCheck="false"
+            aria-label={`Code editor for ${activeFile?.name || "untitled.eaze"}`}
           />
         </div>
       </div>
+      <div className="editor-footnote"><span>Plain English. Real possibilities.</span><span>{lineCount} lines · UTF-8</span></div>
     </div>
   );
 };

@@ -91,6 +91,14 @@ set price to 19.99`}</code>
             <pre>
               <code>{`set fruits to ["Apple", "Banana"]`}</code>
             </pre>
+            <h3>4. Booleans and built-in functions</h3>
+            <pre><code>{`set ready to true
+set items to [1, 2]
+call append(items, 3)
+say call length(items)
+say call uppercase("hello")
+say 10 modulo 3`}</code></pre>
+            <p>Use call with length, append, remove_last, uppercase, lowercase, round, absolute, square_root, minimum, maximum, and random. Minimum and maximum take two numbers; random() takes no arguments and returns a number from 0 up to (but excluding) 1.</p>
           </>
         ),
       },
@@ -125,6 +133,7 @@ set price to 19.99`}</code>
                   <td>/</td>
                   <td>Division</td>
                 </tr>
+                <tr><td>modulo / %</td><td>Remainder (same precedence as multiplication)</td></tr>
               </tbody>
             </table>
             <h3>Logical</h3>

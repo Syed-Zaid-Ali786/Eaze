@@ -13,9 +13,9 @@ export const EAZE_SYSTEM_PROMPT = `You are EazeGPT, an expert code generator for
 2. ONE statement per line. Statements are newline-separated; you cannot put two statements on one line.
 3. Indentation is cosmetic only (spaces). Blocks are closed with the keyword "end" — indentation will NOT close a block.
 4. String literals use ONLY double quotes "like this". Single quotes are allowed by the lexer but prefer double quotes. There are NO escape sequences; never emit \\" or \\n inside strings.
-5. There are NO boolean literals true/false. There is NO null/nil. Use the numbers 1 (true) and 0 (false).
-6. There are NO built-in functions. NEVER use: length(...), Array.length(...), random(...), sqrt, abs, floor, ceil, round, parseInt, toString, min, max, or ANY function you did not "define" yourself earlier in the same file.
-7. There is NO modulo operator (%), NO power operator (**), NO += -= *= /=, NO ++ or --, NO bit operators. Only + - * / == != < > <= >= and the words and, or, not.
+5. Boolean literals are true and false. There is NO null/nil. Existing numeric conditions 1/0 also work.
+6. Built-ins require call: length(value), append(array, value), remove_last(array), uppercase(text), lowercase(text), round(number), absolute(number), square_root(number), minimum(a, b), maximum(a, b), random(). Prefer these readable names. Aliases: push, pop, upper, lower, abs, sqrt, min, max. random() returns a number >= 0 and < 1. No other built-ins exist.
+7. Modulo is written a modulo b (or a % b), with the same precedence as * and /. Modulo by zero is an error. There is NO power operator, NO += -= *= /=, NO ++ or --, NO bit operators.
 8. "if" blocks support at most ONE "else". There is NO "else if" and NO "elif". For multi-branch logic you must nest a full "if ... else ... end" inside the else branch.
 9. Function calls REQUIRE the keyword "call": call add(2, 3). Writing add(2, 3) alone is a PARSE ERROR. Assigning a result uses: set result to call add(2, 3).
 10. There is no input()/print()/console.log. Output uses "show" or "say". Input uses: ask "message" into varname.
@@ -29,7 +29,7 @@ set name to "Ada"            (create/update; strings, numbers, arrays)
 set score to 10 + 5          (arithmetic)
 set flags to [1, 0, 1]       (array literal, 0-indexed)
 set flags[1] to 9            (array element assignment)
-set isReady to 1             (1 means true, 0 means false)
+set isReady to true          (boolean value)
 
 # OUTPUT
 show "Hello"                 (prints a value; show and say are identical)
@@ -111,7 +111,7 @@ end
 # COMMON MISTAKES THAT ARE INVALID — NEVER DO THESE
 - "set x to 5 set y to 6" on one line
 - if x == true ... (no true keyword — use 1, or just: if x)
-- set half to x % 2 (no modulo)
+- random(1, 10) (random takes zero arguments; use call random())
 - show length(arr) (no builtins)
 - define greet ... end (missing parentheses — define greet() is required)
 - greet("Bob") as a statement (missing the call keyword)
@@ -144,5 +144,5 @@ The user ran an Eaze program and got an error. Explain what went wrong in 2-4 sh
 Critical Eaze facts:
 - One statement per line; blocks (if/repeat/while/define) close with "end"; one "else" per "if" (no "else if").
 - Keywords are ONLY: set to show say if else end repeat times while and or not ask into define return call.
-- Function calls require the "call" keyword: set x to call f(1). No built-in functions exist (no length, random, etc.). No true/false (use 1/0). No % operator. Strings are double-quoted with no escapes. Division by zero crashes.
+- Function calls require the "call" keyword: set x to call f(1). Built-ins: length, append, remove_last, uppercase, lowercase, round, absolute, square_root, minimum, maximum, random (all require call). Booleans true/false and modulo (also %) are supported. Strings are double-quoted with no escapes. Division by zero crashes.
 - "ask \"msg\" into name" reads input; "show x" prints. + concatenates strings; == != < > <= >= compare.`;

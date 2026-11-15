@@ -2,6 +2,11 @@ import { TokenType } from "./lexer.js";
 import { ParseError } from "./errors.js";
 
 const { KEYWORD, OPERATOR, NEWLINE, IDENTIFIER } = TokenType;
+const STATEMENTS = {
+  set: "parseSet", show: "parseShow", say: "parseShow", repeat: "parseRepeat",
+  while: "parseWhile", if: "parseIf", ask: "parseAsk", define: "parseDefine", return: "parseReturn",
+};
+const BINARY_LEVELS = [["or"], ["and"], ["==", "!=", "<", ">", "<=", ">="], ["+", "-"], ["*", "/", "%"]];
 
 export class Parser {
   constructor(tokens) {
@@ -16,7 +21,7 @@ export class Parser {
   // Parses statements until one of the given keywords (or EOF) is reached.
   parseUntil(...stops) {
     const body = [];
-    while (!this.isAtEnd() && !stops.some((k) => this.checkKeyword(k))) {
+    while (!this.isAtEnd() && !(this.check(KEYWORD) && stops.includes(this.peek().value))) {
       if (this.match(NEWLINE)) continue;
       body.push(this.parseStatement());
     }
@@ -24,49 +29,34 @@ export class Parser {
   }
 
   parseStatement() {
-    const kw = {
-      set: () => this.parseSet(),
-      show: () => this.parseShow(),
-      say: () => this.parseShow(),
-      repeat: () => this.parseRepeat(),
-      while: () => this.parseWhile(),
-      if: () => this.parseIf(),
-      ask: () => this.parseAsk(),
-      define: () => this.parseDefine(),
-      return: () => this.parseReturn(),
-    };
-    for (const k in kw) if (this.matchKeyword(k)) return kw[k]();
-    if (this.checkKeyword("call")) {
-      const value = this.parseExpression();
-      this.consumeStatementEnd();
-      return { type: "ExpressionStatement", value };
+    if (this.check(KEYWORD) && Object.hasOwn(STATEMENTS, this.peek().value)) {
+      return this[STATEMENTS[this.advance().value]]();
+    }
+    if (this.check(KEYWORD, "call")) {
+      return this.finishStatement("ExpressionStatement", this.parseExpression());
     }
     throw this.error(this.peek(), `Unexpected token: '${this.peek().value}'`);
   }
 
   parseSet() {
+    const target = this.parseAssignmentTarget();
+    this.consume(KEYWORD, "Expected 'to' after variable name.", "to");
+    return this.finishStatement("Assignment", this.parseExpression(), { target });
+  }
+
+  parseAssignmentTarget() {
     const nameToken = this.consume(IDENTIFIER, "Expected variable name.");
-    let target = { type: "Identifier", name: nameToken.value };
-    if (this.matchOperator("[")) {
-      const index = this.parseExpression();
-      this.consumeOperator("]", "Expected ']' after array index.");
-      target = { type: "IndexExpression", object: target, index };
-    }
-    this.consumeKeyword("to", "Expected 'to' after variable name.");
-    const value = this.parseExpression();
-    this.consumeStatementEnd();
-    return { type: "Assignment", target, value };
+    const target = { type: "Identifier", name: nameToken.value };
+    return this.match(OPERATOR, "[") ? this.parseIndex(target) : target;
   }
 
   parseShow() {
-    const value = this.parseExpression();
-    this.consumeStatementEnd();
-    return { type: "Show", value };
+    return this.finishStatement("Show", this.parseExpression());
   }
 
   parseAsk() {
     const message = this.parseExpression();
-    this.consumeKeyword("into", "Expected 'into' after ask message.");
+    this.consume(KEYWORD, "Expected 'into' after ask message.", "into");
     const id = this.consume(IDENTIFIER, "Expected variable name after 'into'.");
     this.consumeStatementEnd();
     return { type: "Ask", message, identifier: id.value };
@@ -74,7 +64,7 @@ export class Parser {
 
   parseRepeat() {
     const times = this.parseExpression();
-    this.consumeKeyword("times", "Expected 'times' after repeat count.");
+    this.consume(KEYWORD, "Expected 'times' after repeat count.", "times");
     this.consumeStatementEnd();
     return { type: "RepeatLoop", times, body: this.parseBlock() };
   }
@@ -90,117 +80,103 @@ export class Parser {
     this.consumeStatementEnd();
     const body = this.parseUntil("end", "else");
     let elseBody = null;
-    if (this.matchKeyword("else")) {
+    if (this.match(KEYWORD, "else")) {
       this.consumeStatementEnd();
       elseBody = this.parseUntil("end");
     }
-    this.consumeKeyword("end", "Expected 'end' to close if block.");
+    this.consume(KEYWORD, "Expected 'end' to close if block.", "end");
     this.consumeStatementEnd();
     return { type: "IfStatement", condition, body, elseBody };
   }
 
   parseDefine() {
     const nameToken = this.consume(IDENTIFIER, "Expected function name after 'define'.");
-    this.consumeOperator("(", "Expected '(' after function name.");
-    const params = this.parseList(")", () => this.consume(IDENTIFIER, "Expected parameter name.").value);
-    this.consumeOperator(")", "Expected ')' after parameters.");
+    this.consume(OPERATOR, "Expected '(' after function name.", "(");
+    const params = this.parseList(")", () => this.consume(IDENTIFIER, "Expected parameter name.").value, "Expected ')' after parameters.");
     this.consumeStatementEnd();
     return { type: "FunctionDeclaration", name: nameToken.value, params, body: this.parseBlock() };
   }
 
   parseReturn() {
     const value = !this.check(NEWLINE) && !this.isAtEnd() ? this.parseExpression() : null;
+    return this.finishStatement("ReturnStatement", value);
+  }
+
+  finishStatement(type, value, fields = {}) {
     this.consumeStatementEnd();
-    return { type: "ReturnStatement", value };
+    return { type, ...fields, value };
   }
 
   parseBlock() {
     const body = this.parseUntil("end");
-    this.consumeKeyword("end", "Expected 'end' to close block.");
+    this.consume(KEYWORD, "Expected 'end' to close block.", "end");
     this.consumeStatementEnd();
     return body;
   }
 
-  // Comma-separated list, stopping before the closing operator.
-  parseList(close, parseItem) {
+  // Parse a comma-separated list and consume its closing delimiter.
+  parseList(close, parseItem, message) {
     const items = [];
     if (!this.check(OPERATOR) || this.peek().value !== close) {
       do items.push(parseItem());
-      while (this.matchOperator(","));
+      while (this.match(OPERATOR, ","));
     }
+    this.consume(OPERATOR, message, close);
     return items;
   }
 
   parseExpression() {
-    return this.parseLogicalOr();
+    return this.parseBinary(-2);
   }
 
-  parseLogicalOr() {
-    return this.parseLogical("or", () => this.parseLogicalAnd());
-  }
-
-  parseLogicalAnd() {
-    return this.parseLogical("and", () => this.parseBinary(0));
-  }
-
-  parseLogical(operator, next) {
-    let expr = next();
-    while (this.matchKeyword(operator)) {
-      expr = { type: "LogicalExpression", operator, left: expr, right: next() };
-    }
-    return expr;
-  }
-
-  // Binary precedence levels: comparison, additive, multiplicative.
+  // Logical levels precede comparison (0), additive (1), and multiplicative (2).
   parseBinary(level) {
-    const levels = [["==", "!=", "<", ">", "<=", ">="], ["+", "-"], ["*", "/"]];
-    if (level === levels.length) return this.parseUnary();
+    if (level === 3) return this.parseUnary();
     let expr = this.parseBinary(level + 1);
-    while (levels[level].some((op) => this.matchOperator(op))) {
-      const operator = this.previous().value;
-      expr = { type: "BinaryExpression", operator, left: expr, right: this.parseBinary(level + 1) };
+    while (this.check(level < 0 ? KEYWORD : OPERATOR) && BINARY_LEVELS[level + 2].includes(this.peek().value)) {
+      const operator = this.advance().value;
+      expr = { type: level < 0 ? "LogicalExpression" : "BinaryExpression", operator, left: expr, right: this.parseBinary(level + 1) };
     }
     return expr;
   }
 
   parseUnary() {
-    for (const [type, op] of [[KEYWORD, "not"], [OPERATOR, "-"]]) {
-      if (type === KEYWORD ? this.matchKeyword(op) : this.matchOperator(op)) {
-        return { type: "UnaryExpression", operator: op, right: this.parseUnary() };
-      }
+    if (this.match(KEYWORD, "not") || this.match(OPERATOR, "-")) {
+      return { type: "UnaryExpression", operator: this.previous().value, right: this.parseUnary() };
     }
     return this.parseCallOrIndex();
   }
 
   parseCallOrIndex() {
-    if (this.matchKeyword("call")) {
+    if (this.match(KEYWORD, "call")) {
       const nameToken = this.consume(IDENTIFIER, "Expected function name after 'call'.");
-      this.consumeOperator("(", "Expected '(' after function name.");
-      const args = this.parseList(")", () => this.parseExpression());
-      this.consumeOperator(")", "Expected ')' after arguments.");
+      this.consume(OPERATOR, "Expected '(' after function name.", "(");
+      const args = this.parseList(")", () => this.parseExpression(), "Expected ')' after arguments.");
       return { type: "FunctionCall", name: nameToken.value, arguments: args };
     }
     let expr = this.parsePrimary();
-    while (this.matchOperator("[")) {
-      const index = this.parseExpression();
-      this.consumeOperator("]", "Expected ']' after array index.");
-      expr = { type: "IndexExpression", object: expr, index };
-    }
+    while (this.match(OPERATOR, "[")) expr = this.parseIndex(expr);
     return expr;
   }
 
+  parseIndex(object) {
+    const index = this.parseExpression();
+    this.consume(OPERATOR, "Expected ']' after array index.", "]");
+    return { type: "IndexExpression", object, index };
+  }
+
   parsePrimary() {
+    if (this.match(KEYWORD, "true") || this.match(KEYWORD, "false")) return { type: "BooleanLiteral", value: this.previous().value === "true" };
     if (this.match(TokenType.NUMBER)) return { type: "NumberLiteral", value: this.previous().value };
     if (this.match(TokenType.STRING)) return { type: "StringLiteral", value: this.previous().value };
     if (this.match(IDENTIFIER)) return { type: "Identifier", name: this.previous().value };
-    if (this.matchOperator("(")) {
+    if (this.match(OPERATOR, "(")) {
       const expr = this.parseExpression();
-      this.consumeOperator(")", "Expected ')' after expression.");
+      this.consume(OPERATOR, "Expected ')' after expression.", ")");
       return expr;
     }
-    if (this.matchOperator("[")) {
-      const elements = this.parseList("]", () => this.parseExpression());
-      this.consumeOperator("]", "Expected ']' after array elements.");
+    if (this.match(OPERATOR, "[")) {
+      const elements = this.parseList("]", () => this.parseExpression(), "Expected ']' after array elements.");
       return { type: "ArrayLiteral", elements };
     }
     throw this.error(this.peek(), `Expected expression, got '${this.peek().value}'`);
@@ -213,28 +189,12 @@ export class Parser {
     throw this.error(this.peek(), "Expected end of statement (newline or EOF).");
   }
 
-  match(type) {
-    return this.check(type) && (this.advance(), true);
+  match(type, value) {
+    return this.check(type, value) && (this.advance(), true);
   }
 
-  matchKeyword(keyword) {
-    return this.checkKeyword(keyword) && (this.advance(), true);
-  }
-
-  matchOperator(op) {
-    return this.checkOperator(op) && (this.advance(), true);
-  }
-
-  check(type) {
-    return !this.isAtEnd() && this.peek().type === type;
-  }
-
-  checkKeyword(keyword) {
-    return this.check(KEYWORD) && this.peek().value === keyword;
-  }
-
-  checkOperator(op) {
-    return this.check(OPERATOR) && this.peek().value === op;
+  check(type, value) {
+    return !this.isAtEnd() && this.peek().type === type && (value === undefined || this.peek().value === value);
   }
 
   advance() {
@@ -254,18 +214,8 @@ export class Parser {
     return this.tokens[this.current - 1];
   }
 
-  consume(type, message) {
-    if (this.check(type)) return this.advance();
-    throw this.error(this.peek(), message);
-  }
-
-  consumeKeyword(keyword, message) {
-    if (this.checkKeyword(keyword)) return this.advance();
-    throw this.error(this.peek(), message);
-  }
-
-  consumeOperator(op, message) {
-    if (this.checkOperator(op)) return this.advance();
+  consume(type, message, value) {
+    if (this.check(type, value)) return this.advance();
     throw this.error(this.peek(), message);
   }
 

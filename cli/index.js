@@ -32,6 +32,7 @@ const HISTORY_PATH = path.join(os.homedir(), ".eaze_history");
 const HISTORY_MAX = 500;
 
 const KEYWORDS = [
+  "true", "false", "modulo",
   "set",
   "to",
   "show",
@@ -53,6 +54,7 @@ const KEYWORDS = [
 ];
 
 const COMMAND_WORDS = [
+  "h", "?",
   "help",
   "vars",
   "clear",
@@ -84,69 +86,52 @@ const COMMAND_WORDS = [
 // COLOR PALETTE & STYLING
 // ============================================================================
 const colors = {
-  primary: chalk.rgb(168, 168, 160), // ash grey
-  secondary: chalk.rgb(232, 220, 196), // parchment
-  success: chalk.rgb(143, 188, 143), // sage
-  error: chalk.rgb(205, 92, 92), // muted crimson
-  warning: chalk.rgb(222, 184, 135), // tan
-  accent: chalk.rgb(139, 119, 84), // bronze (frames)
-  muted: chalk.rgb(140, 135, 125), // warm grey
-  highlight: chalk.rgb(208, 208, 200), // light ash
+  primary: chalk.hex("#91b4ff"), secondary: chalk.hex("#d6dfed"),
+  success: chalk.hex("#82c9ad"), error: chalk.hex("#f08f98"),
+  warning: chalk.hex("#e0bd81"), accent: chalk.hex("#647b9c"),
+  muted: chalk.hex("#91a0b6"), highlight: chalk.hex("#edf2fa"),
 };
+const BUILTINS = "length append remove_last uppercase lowercase round absolute square_root minimum maximum random push pop upper lower abs sqrt min max".split(" ");
+const terminalWidth = () => Math.max(20, process.stdout.columns || Number(process.env.COLUMNS) || 80);
 
-// ============================================================================
-// BOX UI (responsive to terminal width)
-// ============================================================================
-
-// Strip ANSI color codes to get visible length
-function stripAnsi(str) {
-  return str.replace(/\x1b\[[0-9;]*m/g, "");
+function shorten(value, max) {
+  const text = String(value);
+  return text.length <= max ? text : text.slice(0, Math.max(0, max - 1)) + "…";
 }
 
-function boxInnerWidth() {
-  const cols =
-    process.stdout.columns || parseInt(process.env.COLUMNS || "", 10) || 80;
-  return Math.max(30, Math.min(61, cols - 10));
+function heading(title, detail = "") {
+  console.log("\n  " + colors.highlight.bold(title) + (detail ? "  " + colors.muted(detail) : ""));
 }
 
-function boxTop() {
-  const w = boxInnerWidth();
-  return colors.accent("  ╭" + "─".repeat(w + 1) + "╮");
-}
-
-function boxMid() {
-  const w = boxInnerWidth();
-  return colors.accent("  ├" + "─".repeat(w + 1) + "┤");
-}
-
-function boxBottom() {
-  const w = boxInnerWidth();
-  return colors.accent("  ╰" + "─".repeat(w + 1) + "╯");
-}
-
-// Format content to fit perfectly in box (callers truncate values first;
-// this is a safety net that strips color rather than breaking ANSI codes)
-function boxLine(content) {
-  const inner = boxInnerWidth();
-  const contentStr = content.toString();
-  const visibleLength = stripAnsi(contentStr).length;
-  if (visibleLength > inner) {
-    const plain = stripAnsi(contentStr).slice(0, inner - 1) + "…";
-    return colors.accent("  │ ") + plain + colors.accent("│");
+function printBrand(compact = false) {
+  console.log("");
+  if (!compact && terminalWidth() >= 40) {
+    console.log(colors.primary("  █▀▀ ▄▀█ ▀█ █▀▀"));
+    console.log(colors.primary("  ██▄ █▀█ █▄ ██▄") + colors.success("  ●"));
+    console.log("");
   }
-  const padding = inner - visibleLength;
-  return (
-    colors.accent("  │ ") +
-    contentStr +
-    " ".repeat(padding) +
-    colors.accent("│")
-  );
+  console.log("  " + colors.highlight.bold("eaze") + colors.success(".") + colors.muted("  /  " + (compact ? "CLI" : "THE ENGLISH-LIKE LANGUAGE")));
+  console.log("  " + colors.secondary("Less syntax. More ideas.") + colors.muted("  v" + VERSION));
 }
 
-function shorten(s, max) {
-  const str = String(s);
-  if (str.length <= max) return str;
-  return str.slice(0, Math.max(0, max - 1)) + "…";
+// Keep descriptions readable on small terminals instead of cutting them off.
+function rows(entries) {
+  const stacked = terminalWidth() < 64;
+  const labelWidth = Math.max(...entries.map(([label]) => label.length)) + 2;
+  for (const [label, description] of entries) {
+    const indent = stacked ? 4 : labelWidth + 2;
+    const width = Math.max(10, terminalWidth() - indent - 2);
+    const words = String(description).split(/\s+/);
+    const lines = [""];
+    for (const word of words) {
+      if (lines.at(-1) && lines.at(-1).length + word.length + 1 > width) lines.push("");
+      lines[lines.length - 1] += (lines.at(-1) ? " " : "") + word;
+    }
+    if (stacked) console.log("  " + colors.primary(label));
+    lines.forEach((line, index) => console.log(
+      (!stacked && index === 0 ? "  " + colors.primary(label.padEnd(labelWidth)) : " ".repeat(indent)) + colors.muted(line),
+    ));
+  }
 }
 
 // ============================================================================
@@ -170,145 +155,60 @@ function printEasterEgg() {
 // BANNER & WELCOME
 // ============================================================================
 function printWelcomeBanner(opts = {}) {
-  if (opts.clearScreen !== false && process.stdout.isTTY) {
-    console.clear();
-  }
-
-  const w = Math.min(54, Math.max(30, (process.stdout.columns || 80) - 6));
-  const rule = colors.accent("  " + "─".repeat(w));
-  console.log("");
-  console.log(colors.primary("  ███████╗ █████╗ ███████╗███████╗"));
-  console.log(colors.primary("  ██╔════╝██╔══██╗╚══███╔╝██╔════╝"));
-  console.log(colors.highlight("  █████╗  ███████║  ███╔╝ █████╗  "));
-  console.log(colors.highlight("  ██╔══╝  ██╔══██║ ███╔╝  ██╔══╝  "));
-  console.log(colors.secondary("  ███████╗██║  ██║███████╗███████╗"));
-  console.log(colors.secondary("  ╚══════╝╚═╝  ╚═╝╚══════╝╚══════╝"));
-  console.log("");
-  console.log(rule);
-  console.log(
-    `  ${colors.secondary("A gentle language for new programmers")}  ${colors.muted("v" + VERSION)}`,
-  );
-  console.log(rule);
-  console.log("");
-
-  const tips = [
-    ["help", "list commands"],
-    ["vars", "inspect variables"],
-    ["load <file>", "run an .eaze file"],
-    ["exit", "leave the REPL"],
-  ];
-  tips.forEach(([cmd, desc]) => {
-    console.log(
-      `  ${colors.primary(figures.pointer)} ${colors.secondary(cmd.padEnd(12))} ${colors.muted(desc)}`,
-    );
-  });
-  console.log("");
-  console.log(
-    colors.muted("  Try:  ") + colors.highlight('set name to "world"') + colors.muted("  then  ") + colors.highlight("show name"),
-  );
-  console.log(
-    colors.muted("  Tip:  Tab completes keywords · multi-line blocks end with ") + colors.primary("end"),
-  );
-  console.log("");
+  if (opts.clearScreen !== false && process.stdout.isTTY) console.clear();
+  printBrand();
+  console.log("\n  " + colors.muted("Start with ") + colors.primary('say "Hello, world!"'));
+  rows([["help", "Commands and language guide"], ["vars", "See what your program remembers"]]);
+  console.log("\n" + colors.muted("  Tab completes · ↑ history"));
+  console.log(colors.muted("  end closes blocks · Ctrl+C cancels input\n"));
 }
-// ============================================================================
-// HELP MENUS
-// ============================================================================
+
 function printHelpMenu() {
-  console.log("");
-  console.log(boxTop());
-  console.log(boxLine(colors.primary("E A Z E   ·   COMMAND REFERENCE")));
-  console.log(boxMid());
-
-  const commands = [
-    ["help", "Show this help menu"],
-    ["vars", "Display all defined variables and functions"],
-    ["reset", "Clear all variables and start fresh"],
-    ["load <file>", "Load and run an .eaze file"],
-    ["save <file>", "Save this session to a file"],
-    ["tokens on|off", "Auto-show lexer tokens on each run"],
-    ["ast on|off", "Auto-show the AST on each run"],
-    ["time on|off", "Auto-show execution time on each run"],
+  printBrand(true);
+  heading("Your workspace", "REPL commands");
+  rows([
+    ["help / ?", "Show this guide; commands also accept a leading dot"],
+    ["vars", "Inspect variables and functions"],
+    ["reset", "Clear variables; keep your session history"],
+    ["load <file>", "Run a file in the current environment; quote paths with spaces"],
+    ["save <file>", "Save the code entered in this session"],
+    ["tokens / ast / time", "Toggle a diagnostic view, or explicitly use on or off"],
     ["explain", "Ask the AI debugger about the last error"],
-    ["clear", "Clear the screen"],
-    ["exit", "Exit the REPL"],
-  ];
-
-  commands.forEach(([cmd, desc]) => {
-    const cmdCol = colors.primary(shorten(cmd, 18).padEnd(18));
-    const descCol = colors.muted(shorten(desc, boxInnerWidth() - 22));
-    console.log(boxLine(`${cmdCol} ${colors.muted(figures.arrowRight)} ${descCol}`));
-  });
-
-  console.log(boxMid());
-  console.log(boxLine(colors.secondary("LANGUAGE FEATURES")));
-  console.log(boxMid());
-
-  const features = [
-    ["Variables:", "set x to 5"],
-    ["Output:", "show x"],
-    ["Input:", 'ask "Name?" into name'],
-    ["Loops:", "repeat 5 times / while x < 10"],
-    ["Conditionals:", "if x > 0 / else / end"],
-    ["Functions:", "define add(a, b) / return a + b"],
-    ["Comments:", "# This is a comment"],
-  ];
-
-  features.forEach(([label, example]) => {
-    const labelCol = colors.highlight(shorten(label, 15).padEnd(15));
-    const exampleCol = colors.muted(shorten(example, boxInnerWidth() - 18));
-    console.log(boxLine(`${labelCol} ${exampleCol}`));
-  });
-
-  console.log(boxMid());
-  console.log(boxLine(colors.secondary("CLI FLAGS (outside REPL)")));
-  console.log(boxMid());
-  const flags = [
-    ["eaze file.eaze", "Run one or more files"],
-    ["-e \"show 1\"", "Evaluate a snippet"],
-    ["--check", "Syntax-check without running"],
-    ["--tokens --ast", "Dump tokens / AST"],
-    ["--time", "Show execution time"],
-    ["--no-color", "Disable colors"],
-  ];
-  flags.forEach(([flag, desc]) => {
-    const flagCol = colors.primary(shorten(flag, 18).padEnd(18));
-    const descCol = colors.muted(shorten(desc, boxInnerWidth() - 22));
-    console.log(boxLine(`${flagCol} ${colors.muted(figures.arrowRight)} ${descCol}`));
-  });
-
-  console.log(boxBottom());
-  console.log("");
+    ["clear", "Clear the screen and show the welcome message"],
+    ["exit / quit", "Leave Eaze"],
+  ]);
+  heading("Write it like you mean it", "language basics");
+  rows([
+    ["Remember a value", "set score to 10"], ["Show a result", 'say "Hello!"'],
+    ["Ask a question", 'ask "Name?" into name'], ["Make a decision", "if ready / else / end"],
+    ["Repeat something", "repeat 5 times / end"], ["Keep going", "while score < 10 / end"],
+    ["Define a function", "define add(a, b) / return a + b / end"],
+    ["Use a function", "say call length([1, 2, 3])"],
+    ["Booleans / remainder", "true, false · 10 modulo 3 (also 10 % 3)"],
+  ]);
+  heading("Built-in functions", "always start with call");
+  rows([
+    ["Lists and text", "length, append, remove_last, uppercase, lowercase"],
+    ["Numbers", "round, absolute, square_root, minimum, maximum, random"],
+  ]);
+  console.log("\n" + colors.muted("  Close blocks with end. Ctrl+C discards an unfinished block.\n"));
 }
 
 function printCliHelp() {
-  console.log(`Eaze v${VERSION} - a beginner-friendly programming language`);
+  printBrand(true);
   console.log("");
-  console.log("Usage:");
-  console.log("  eaze [options] [file ...]      Run files (shares one environment)");
-  console.log('  eaze [options] -e "code"        Evaluate a snippet');
-  console.log("  eaze                           Start the interactive REPL");
-  console.log("");
-  console.log("Options:");
-  console.log("  -h, --help       Show this help");
-  console.log("  -v, --version    Show version");
-  console.log('  -e, --eval CODE  Evaluate CODE (can be repeated, joined by newline)');
-  console.log("  --check          Parse only, do not run");
-  console.log("  --tokens         Print lexer tokens before running");
-  console.log("  --ast            Print the AST before running");
-  console.log("  --time           Print execution time");
-  console.log("  --no-color       Disable colored output (also respects NO_COLOR)");
-  console.log("  --               End of options");
-  console.log("");
-  console.log("Examples:");
-  console.log("  eaze examples/fibonacci.eaze");
-  console.log('  eaze -e "show 1 + 2"');
-  console.log("  eaze --check program.eaze");
-  console.log("  eaze --time --tokens program.eaze");
-  console.log("  echo 5 | eaze examples/fibonacci.eaze");
-  console.log("");
-  console.log("REPL commands: help, vars, reset, load <f>, save <f>,");
-  console.log("               tokens|ast|time on|off, explain, clear, exit");
+  rows([["eaze", "Start an interactive session"], ["eaze [options] <file ...>", "Run files in one shared environment"], ['eaze -e "say 1 + 2"', "Run code directly"]]);
+  heading("Options");
+  rows([
+    ["-h, --help", "Show this guide"], ["-v, --version", "Show the version"],
+    ["-e, --eval CODE", "Evaluate code; repeat the flag to add more lines"],
+    ["--check", "Check syntax without executing"], ["--tokens", "Show lexer tokens"],
+    ["--ast", "Show the syntax tree"], ["--time", "Show execution time"],
+    ["--no-color", "Disable colors; NO_COLOR is also supported"], ["--", "Treat the remaining arguments as file paths"],
+  ]);
+  heading("Try it");
+  rows([["Run a file", "eaze examples/builtins.eaze"], ["Check a file", "eaze --check program.eaze"], ["Provide input", "echo 5 | eaze examples/fibonacci.eaze"]]);
+  console.log("\n" + colors.muted("  Type help in a session for more.\n"));
 }
 
 // ============================================================================
@@ -391,7 +291,7 @@ function formatValue(value, maxLen) {
   let raw;
   if (value && value.isFunction) {
     raw = `[Function: ${value.name}(${value.params.join(", ")})]`;
-    return colors.accent(shorten(raw, maxLen));
+    return shorten(raw, maxLen);
   }
   if (Array.isArray(value)) {
     try {
@@ -399,7 +299,7 @@ function formatValue(value, maxLen) {
     } catch {
       raw = String(value);
     }
-    return colors.primary(shorten(raw, maxLen));
+    return shorten(raw, maxLen);
   }
   try {
     raw = JSON.stringify(value);
@@ -407,7 +307,7 @@ function formatValue(value, maxLen) {
   } catch {
     raw = String(value);
   }
-  return colors.primary(shorten(raw, maxLen));
+  return shorten(raw, maxLen);
 }
 
 function printVariables(env) {
@@ -422,21 +322,10 @@ function printVariables(env) {
     return;
   }
 
-  console.log("");
-  console.log(boxTop());
-  console.log(boxLine(colors.primary(`CURRENT VARIABLES (${variables.length})`)));
-  console.log(boxMid());
-
-  const inner = boxInnerWidth();
-  variables.forEach(([key, value]) => {
-    const keyShown = shorten(key, 20);
-    const maxValLen = Math.max(10, inner - keyShown.length - 5);
-    const displayValue = formatValue(value, maxValLen);
-    const keyCol = colors.secondary(keyShown);
-    console.log(boxLine(`${keyCol} ${colors.muted(figures.arrowRight)} ${displayValue}`));
-  });
-
-  console.log(boxBottom());
+  heading("Variables", String(variables.length) + " in this session");
+  for (const [name, value] of variables) {
+    console.log("  " + colors.primary(name) + colors.muted(" → ") + colors.secondary(formatValue(value, 240)));
+  }
   console.log("");
 }
 
@@ -540,24 +429,22 @@ function lexAndParse(code) {
 }
 
 function printErrorWithContext(error, code) {
-  console.log("");
-  console.log(`  ${colors.error(figures.cross)} ${colors.secondary(error.toString())}`);
-  if (error && error.line) {
+  heading(colors.error(error.name || "Error"));
+  console.log("  " + colors.secondary(error.message || String(error)));
+  if (error.line) {
     const lines = String(code).split("\n");
     const target = lines[error.line - 1];
     if (target !== undefined) {
-      console.log(colors.muted(`   │ ${target}`));
-      if (error.column) {
-        const pad = " ".repeat(Math.max(0, error.column - 1));
-        console.log(`   │ ${pad}${colors.error("^")}`);
-      }
+      const prefix = "  " + error.line + " │ ";
+      const offset = Math.max(0, (error.column || 1) - 1);
+      const start = Math.max(0, offset - Math.max(5, terminalWidth() - prefix.length - 12));
+      console.log("\n" + colors.muted(prefix) + shorten((start ? "…" : "") + target.slice(start).replace(/\t/g, " "), terminalWidth() - prefix.length));
+      console.log(" ".repeat(prefix.length + offset - start + (start ? 1 : 0)) + colors.error("^"));
     }
   }
-  console.log(
-    colors.muted(
-      `  ${figures.pointer} hint: fix the line above, or type "explain" in the REPL for AI help`,
-    ),
-  );
+  console.log("\n" + colors.muted(process.argv.length <= 2
+    ? '  Edit the code and try again. Type explain for AI help.'
+    : '  Edit the code and run it again. Use --check to check syntax.'));
   console.log("");
 }
 
@@ -598,6 +485,7 @@ async function run(code, opts = {}) {
     }
 
     await interpreter.run(ast);
+    if (!printedAnyOutput && opts.feedback) console.log(colors.success("  ✓ Done"));
 
     if (printedAnyOutput) {
       process.stdout.write("\n");
@@ -746,7 +634,7 @@ async function runFile(filename, opts = {}) {
   }
 
   console.log(
-    `\n  ${colors.primary(figures.play)} Running file: ${colors.secondary(filename)}\n`,
+    `\n  ${colors.primary(figures.play)} ${opts.check ? "Checking" : "Running"} ${colors.secondary(filename)}\n`,
   );
 
   if (opts.check) {
@@ -877,7 +765,7 @@ function makeCompleter() {
     const prefix = tokenMatch ? tokenMatch[0] : "";
     if (!prefix) return [[], line];
     const varNames = Array.from(interpreter.globalEnv.variables.keys());
-    const pool = [...new Set([...COMMAND_WORDS, ...KEYWORDS, ...varNames])];
+    const pool = [...new Set([...COMMAND_WORDS, ...KEYWORDS, ...BUILTINS, ...varNames])];
     const hits = pool.filter((w) => w.startsWith(prefix) && w !== prefix);
     return [hits, prefix];
   };
@@ -886,8 +774,8 @@ function makeCompleter() {
 function startREPL(cliOpts = {}) {
   printWelcomeBanner();
 
-  const mainPrompt = colors.primary("eaze ") + colors.accent("❯ ");
-  const contPrompt = colors.accent("  ┆ ");
+  const mainPrompt = colors.primary("eaze") + colors.muted(" › ");
+  const contPrompt = () => colors.muted(String(buffer.split("\n").length + 1).padStart(3) + " │ ");
 
   const rl = readline.createInterface({
     input: process.stdin,
@@ -931,7 +819,7 @@ function startREPL(cliOpts = {}) {
   }
 
   function showContinuationPrompt() {
-    rl.setPrompt(contPrompt);
+    rl.setPrompt(contPrompt());
     rl.prompt();
   }
 
@@ -972,7 +860,7 @@ function startREPL(cliOpts = {}) {
       case "exit":
       case "quit":
         console.log("");
-        console.log(colors.secondary(`  ${figures.heart} Thanks for using Eaze!\n`));
+        console.log(colors.secondary("  Keep your ideas running.") + colors.primary("  eaze.\n"));
         rl.close();
         return;
       case "tokens":
@@ -1020,7 +908,7 @@ function startREPL(cliOpts = {}) {
         isRunning = true;
         rl.pause();
         try {
-          const res = await run(code, { showTokens, showAst, showTime });
+          const res = await run(code, { showTokens, showAst, showTime, feedback: true });
           lastCode = code;
           lastError = res.ok ? null : res.error;
         } finally {
@@ -1076,7 +964,7 @@ function startREPL(cliOpts = {}) {
     const cmd = spaceIdx === -1 ? normalized : normalized.slice(0, spaceIdx);
     const arg =
       spaceIdx === -1 ? "" : normalized.slice(spaceIdx + 1).trim();
-    if (COMMAND_WORDS.includes(cmd) || COMMAND_WORDS.includes("." + cmd)) {
+    if (COMMAND_WORDS.includes(cmd.toLowerCase()) || cmd === "?" || cmd === "Eaze") {
       // `Eaze` easter egg stays case-sensitive; everything else lowercase
       if (cmd === "Eaze") return { cmd, arg };
       const lower = cmd.toLowerCase();
@@ -1148,7 +1036,7 @@ function startREPL(cliOpts = {}) {
       sigintDuringRun = 0;
       rl.pause();
       try {
-        const res = await run(code, { showTokens, showAst, showTime });
+        const res = await run(code, { showTokens, showAst, showTime, feedback: true });
         lastCode = code;
         lastError = res.ok ? null : res.error;
       } finally {
@@ -1237,7 +1125,7 @@ function startREPL(cliOpts = {}) {
     const now = Date.now();
     if (now - lastSigint < 2000) {
       console.log("");
-      console.log(colors.secondary(`  ${figures.heart} Thanks for using Eaze!\n`));
+      console.log(colors.secondary("  Keep your ideas running.") + colors.primary("  eaze.\n"));
       saveSessionHistory(rl, typedHistory, preloadedHistory);
       process.exit(0);
     }
@@ -1258,7 +1146,7 @@ function startREPL(cliOpts = {}) {
 async function main() {
   const { opts, errors } = parseArgs(process.argv.slice(2));
 
-  if (opts.noColor || process.env.NO_COLOR) {
+  if (opts.noColor || process.env.NO_COLOR !== undefined) {
     try {
       chalk.level = 0;
     } catch {}

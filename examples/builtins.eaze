@@ -1,0 +1,17 @@
+# Words for everyday operations. Function calls always start with call.
+set ready to true
+set scores to [12, 7, 20]
+call append(scores, 9)
+if ready and not false
+    say call uppercase("Eaze is ready")
+    say call length(scores)
+    say 10 modulo 3
+    say call remove_last(scores)
+    say call round(2.6)
+    say call absolute(-5)
+    say call square_root(81)
+    say call minimum(3, 7)
+    say call maximum(3, 7)
+    say call lowercase("HELLO")
+    say call random()
+end

@@ -1,5 +1,6 @@
 import { Environment } from "./runtime.js";
 import { RuntimeError } from "./errors.js";
+import { callBuiltin } from "./builtins.js";
 
 class ReturnValue {
   constructor(value) {
@@ -11,6 +12,11 @@ const BINARY_OPS = {
   "+": (a, b) => a + b,
   "-": (a, b) => a - b,
   "*": (a, b) => a * b,
+  "%": (a, b) => {
+    if (typeof a !== "number" || typeof b !== "number") throw new RuntimeError("Modulo needs two numbers");
+    if (b === 0) throw new RuntimeError("Modulo by zero");
+    return a % b;
+  },
   "/": (a, b) => {
     if (b === 0) throw new RuntimeError("Division by zero");
     return a / b;
@@ -45,14 +51,18 @@ export class Interpreter {
 
   async run(ast) {
     this.output = [];
+    this.resetTrace?.();
+    this.logTrace?.(ast, "start", "Program started");
     try {
       await this.evaluate(ast, this.globalEnv);
     } catch (e) {
       if (e instanceof ReturnValue) {
         throw new RuntimeError("Return statement outside function");
       }
+      this.logTrace?.(null, "error", e.message);
       throw e;
     }
+    this.logTrace?.(ast, "end", "Program finished");
     return this.output;
   }
 
@@ -74,10 +84,14 @@ export class Interpreter {
       case "Assignment": {
         const value = await this.evaluate(node.value, env);
         if (node.target.type === "Identifier") {
+          const before = env.variables.has(node.target.name) ? env.get(node.target.name) : "(new)";
           env.set(node.target.name, value);
+          this.logTrace?.(node, "set", `${node.target.name} set to ${value}`, { name: node.target.name, before, after: value });
         } else if (node.target.type === "IndexExpression") {
           const [array, index] = await this.indexed(node.target, env);
+          const before = array[index];
           array[index] = value;
+          this.logTrace?.(node, "set", `item at ${index} set to ${value}`, { target: "array", index, before, after: value, scope: "array" });
         } else {
           throw new RuntimeError("Invalid assignment target");
         }
@@ -87,12 +101,14 @@ export class Interpreter {
       case "Show": {
         const value = await this.evaluate(node.value, env);
         this.output.push(value);
+        this.logTrace?.(node, "say", `show ${value}`, { value, verb: "show" });
         if (this.outputHandler) await this.outputHandler(value);
         return null;
       }
 
       case "Ask": {
         const message = await this.evaluate(node.message, env);
+        this.logTrace?.(node, "ask", `ask "${message}"`, { prompt: message, identifier: node.identifier });
         let answer = await this.inputHandler(message);
         // Attempt to parse to number if it looks like one
         const trimmed = answer.toString().trim();
@@ -107,20 +123,31 @@ export class Interpreter {
         if (typeof times !== "number") {
           throw new RuntimeError(`Repeat count must be a number, got ${typeof times}`);
         }
+        this.logTrace?.(node, "repeat", `repeat ${times} times`, { times });
         for (let i = 0; i < times; i++) {
+          this.logTrace?.(node, "loop", `turn ${i + 1} of ${times}`, { i: i + 1, times });
           await this.evaluateBlock(node.body, new Environment(env));
         }
+        this.logTrace?.(node, "repeat", "done repeating", { times });
         return null;
       }
 
-      case "WhileLoop":
+      case "WhileLoop": {
+        let iter = 0;
+        this.logTrace?.(node, "while", "start while loop", { condition: true });
         while (await this.evaluate(node.condition, env)) {
+          iter++;
+          this.logTrace?.(node, "loop", `while turn ${iter}`, { iter });
           await this.evaluateBlock(node.body, new Environment(env));
         }
+        this.logTrace?.(node, "while", "end while loop", { iter });
         return null;
+      }
 
       case "IfStatement": {
-        const body = (await this.evaluate(node.condition, env)) ? node.body : node.elseBody;
+        const condition = await this.evaluate(node.condition, env);
+        this.logTrace?.(node, "if", `if condition is ${condition}`, { condition, hasElse: !!node.elseBody });
+        const body = condition ? node.body : node.elseBody;
         if (body) await this.evaluateBlock(body, new Environment(env));
         return null;
       }
@@ -139,6 +166,10 @@ export class Interpreter {
         return null;
 
       case "FunctionCall": {
+        if (!env.has(node.name)) {
+          const builtin = await callBuiltin(node, argument => this.evaluate(argument, env));
+          if (builtin) return builtin.value;
+        }
         const fn = env.get(node.name);
         if (!fn || !fn.isFunction) {
           throw new RuntimeError(`'${node.name}' is not a function`);
@@ -195,6 +226,7 @@ export class Interpreter {
       }
 
       case "NumberLiteral":
+      case "BooleanLiteral":
       case "StringLiteral":
         return node.value;
 

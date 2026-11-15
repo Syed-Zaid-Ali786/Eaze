@@ -35,14 +35,15 @@ const blocks = [
 
 const BlocksBar = ({ onInsert }) => (
   <div className="blocks-bar">
+    <span className="blocks-label">Insert a little logic</span>
+    <div className="blocks-chips">
     {blocks.map((block) => (
       <button
         key={block.label}
         type="button"
         className={`chip chip-${block.tone}`}
         title={`Insert ${block.label}`}
-        onMouseDown={(e) => {
-          e.preventDefault();
+        onClick={() => {
           onInsert(block.snippet);
         }}
       >
@@ -50,6 +51,7 @@ const BlocksBar = ({ onInsert }) => (
         <span className="chip-label">{block.label}</span>
       </button>
     ))}
+    </div>
   </div>
 );
 

@@ -35,6 +35,7 @@ const Console = () => {
 
     return (
         <div className={`panel console-panel ${isConsoleFull ? 'fullscreen' : ''}`}>
+            <div className="results-heading"><span><Icon name="terminal" size={16} /> The result</span><span className="results-tag">{outputs.length ? `${outputs.length} lines` : 'Ready to run'}</span></div>
             <div className="panel-header">
                 <div className="tabs">
                     {TABS.map((tab) => (
@@ -72,10 +73,10 @@ const Console = () => {
 
             <div className="tab-content" style={{ display: activeTab === 'output' ? 'block' : 'none' }}>
                 {outputs.length === 0 ? (
-                    <div className="panel-empty">Program output will show here...</div>
+                    <div className="output-welcome"><div className="output-symbol"><Icon name="play" size={24} /></div><h2>Make something happen.</h2><p>Your ideas come to life here.<br />Run your code to see the result.</p><kbd>F5</kbd><span className="output-shortcut">or click Run code above</span></div>
                 ) : (
                     outputs.map((out, i) => (
-                        <div key={i} className="console-line">{String(out)}</div>
+                        <div key={i} className={`console-line ${String(out).startsWith('Error:') ? 'console-error' : ''}`}><span className="output-line-number">{String(i + 1).padStart(2, '0')}</span>{String(out)}</div>
                     ))
                 )}
             </div>

@@ -78,6 +78,11 @@ A modern, browser-based playground that features:
 
 ## 🛠️ Installation & Usage
 
+Eaze now supports `true` / `false`, `10 modulo 3` (also `%`), and built-in
+functions such as `call length(items)` and `call uppercase("hello")`.
+See [the built-in function guide](documentation/BUILTINS.md) for all functions,
+aliases, argument rules, and examples.
+
 ### 1. Prerequisites
 Ensure you have [Node.js](https://nodejs.org/) (v18+) installed.
 

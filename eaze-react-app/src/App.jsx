@@ -12,6 +12,7 @@ import TemplatesModal from "./components/TemplatesModal";
 import HelpModal from "./components/HelpModal";
 import AIPanel from "./components/AIPanel";
 import "./App.css";
+import "./studio.css";
 
 const AppContent = () => {
   const {
@@ -21,6 +22,8 @@ const AppContent = () => {
     setModals,
     sidebarCollapsed,
     isDesktop,
+    settings,
+    files,
   } = useAppContext();
 
   // Desktop only: hide our window bar while the window is fullscreen.
@@ -64,19 +67,25 @@ const AppContent = () => {
           <div className="app-shell">
             <Sidebar />
             <main className="main">
-              <BlocksBar onInsert={handleInsertSnippet} />
+              <div className="workspace-heading">
+                <div><span className="eyebrow">YOUR CODING SPACE</span><h1>A little code. A lot of possibility.</h1><p>Think it. Write it. Watch it work.</p></div>
+                <span className="language-badge"><span className="status-dot" /> Eaze language</span>
+              </div>
               <div className="workspace">
+                <div className="code-column">
                 <Editor
                   code={activeFile.content}
                   onCodeChange={updateActiveFileContent}
                 />
-                <div className="resizer"></div>
+                <BlocksBar onInsert={handleInsertSnippet} />
+                </div>
                 <Console />
               </div>
             </main>
 
             <AIPanel />
           </div>
+          <footer className="statusbar"><span><span className="status-dot" /> All systems ready</span><span>{files.length} files in workspace</span><span className="statusbar-right">{settings.liveMode ? "Live execution on" : "F5 to run"}<span>Eaze 1.0</span></span></footer>
 
           <SettingsModal
             isOpen={modals.settings}

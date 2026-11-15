@@ -11,7 +11,7 @@ export const TokenType = {
 };
 
 const KEYWORDS = new Set(
-  "set to show say if else end repeat times while and or not ask into define return call".split(" "),
+  "set to show say if else end repeat times while and or not ask into define return call true false".split(" "),
 );
 
 const TWO_CHAR_OPS = new Set(["==", "!=", "<=", ">="]);
@@ -46,18 +46,10 @@ export class Lexer {
       this.column = 1;
       return token;
     }
-    if (/[0-9]/.test(char)) {
-      const t = this.readWhile(/[0-9.]/, TokenType.NUMBER);
-      t.value = parseFloat(t.value);
-      return t;
-    }
-    if (/[a-zA-Z_]/.test(char)) {
-      const t = this.readWhile(/[a-zA-Z0-9_]/, TokenType.IDENTIFIER);
-      if (KEYWORDS.has(t.value)) t.type = TokenType.KEYWORD;
-      return t;
-    }
+    if (/[0-9]/.test(char)) return this.readNumber();
+    if (/[a-zA-Z_]/.test(char)) return this.readIdentifierOrKeyword();
     if (char === '"' || char === "'") return this.readString(char);
-    if (/[+\-*/=<>()[\],!]/.test(char)) return this.readOperator();
+    if (/[+\-*/%=<>()[\],!]/.test(char)) return this.readOperator();
 
     throw new LexerError(`Unexpected character: '${char}'`, this.line, this.column);
   }
@@ -75,9 +67,8 @@ export class Lexer {
     }
   }
 
-  readWhile(re, type) {
+  readWhile(re, type, column = this.column) {
     const start = this.position;
-    const column = this.column;
     while (this.position < this.input.length && re.test(this.input[this.position])) {
       this.position++;
       this.column++;
@@ -87,18 +78,28 @@ export class Lexer {
 
   readString(quote) {
     const column = this.column;
-    const start = ++this.position;
+    this.position++;
     this.column++;
-    while (this.position < this.input.length && this.input[this.position] !== quote) {
-      this.position++;
-      this.column++;
-    }
+    const token = this.readWhile(quote === '"' ? /[^"]/ : /[^']/, TokenType.STRING, column);
     if (this.position >= this.input.length) {
       throw new LexerError("Unterminated string", this.line, column);
     }
-    const value = this.input.slice(start, this.position++);
+    this.position++;
     this.column++;
-    return { type: TokenType.STRING, value, line: this.line, column };
+    return token;
+  }
+
+  readNumber() {
+    const token = this.readWhile(/[0-9.]/, TokenType.NUMBER);
+    token.value = parseFloat(token.value);
+    return token;
+  }
+
+  readIdentifierOrKeyword() {
+    const token = this.readWhile(/[a-zA-Z0-9_]/, TokenType.IDENTIFIER);
+    if (KEYWORDS.has(token.value)) token.type = TokenType.KEYWORD;
+    if (token.value === "modulo") Object.assign(token, { type: TokenType.OPERATOR, value: "%" });
+    return token;
   }
 
   readOperator() {

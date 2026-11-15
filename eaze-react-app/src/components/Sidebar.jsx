@@ -36,6 +36,7 @@ const Sidebar = () => {
     deleteWorkspacePath,
     renameFile,
     deleteFile,
+    setModals,
   } = useAppContext();
 
   // legacy flat-list modal (browser mode): add | rename | delete
@@ -227,8 +228,9 @@ const Sidebar = () => {
   return (
     <>
       <aside className={`sidebar ${sidebarCollapsed ? "collapsed" : ""}`}>
+        {!sidebarCollapsed && <div className="workspace-identity"><span className="workspace-monogram">e.</span><div><strong>My workspace</strong><span>A place to experiment</span></div></div>}
         <div className="sidebar-header">
-          <span className="sidebar-label">My Docs</span>
+          <span className="sidebar-label">Explorer</span>
           {!sidebarCollapsed && inWorkspace && (
             <div className="ws-actions">
               <HeaderBtn
@@ -261,11 +263,11 @@ const Sidebar = () => {
           {!inWorkspace && (
             <button
               className="ws-action"
-              title="Open Folder to start a workspace"
-              onClick={openFolder}
+              title={isDesktop ? "Open Folder to start a workspace" : "New file"}
+              onClick={isDesktop ? openFolder : openAddModal}
               type="button"
             >
-              <Icon name="folder-open" size={16} />
+              <Icon name={isDesktop ? "folder-open" : "plus"} size={16} />
             </button>
           )}
         </div>
@@ -343,6 +345,7 @@ const Sidebar = () => {
           </div>
         )}
 
+        {!sidebarCollapsed && <div className="sidebar-learning"><span className="eyebrow">A SMALL SPARK</span><h2>Big ideas start<br />with a little hello.</h2><p>Find your next experiment in the example library.</p><button type="button" onClick={() => setModals(prev => ({ ...prev, templates: true }))}>Explore examples <Icon name="chevron-right" size={15} /></button><button type="button" className="learning-help" onClick={() => setModals(prev => ({ ...prev, help: true }))}><Icon name="help" size={15} /> Language guide</button></div>}
         <button
           type="button"
           className="sidebar-toggle"

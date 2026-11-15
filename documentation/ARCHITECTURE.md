@@ -79,6 +79,21 @@ The entire system is built in **JavaScript (Node.js)** with ES modules. It can o
 
 ## Core Components
 
+The root `engine/` directory is the canonical engine for the CLI, AI server,
+and React/Electron playground. Make language changes there rather than copying
+engine files into the app.
+
+The modules in `eaze-react-app/src/engine/` are compatibility adapters: lexer,
+runtime, and errors are re-exports; the parser adds statement locations; and the
+interpreter stores visualizer traces through the core's optional `logTrace` and
+`resetTrace` hooks. All program execution is inherited from the root interpreter.
+Vite bundles the shared engine into the app, including desktop distributions.
+
+Run `npm test` from the repository root for behavior regression checks. The
+baseline fixture records SHA-256 fingerprints of tokens, ASTs, output events,
+globals, errors, and playground traces captured before the engine consolidation.
+Update that fixture only for intentional language behavior changes.
+
 ### 1. **Lexer** (`engine/lexer.js`)
 **Purpose**: Tokenizes source code into a stream of tokens
 
